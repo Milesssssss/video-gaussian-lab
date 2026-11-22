@@ -64,9 +64,17 @@ npx playwright install --with-deps chromium
 npm run test:browser
 ```
 
-**本地已通过类型检查、16 / 16 项单元测试和生产构建。** Three.js 视口已分为懒加载产物，本次构建为 591.99 kB（gzip 148.45 kB），仍有超过 500 kB 的 chunk 提示；这项提示不代表构建失败。
+**验证状态：**分支 CI 已通过依赖安装、类型检查、16 / 16 项单元测试、生产构建和 6 / 6 项浏览器检查。三维视口用例会等待首帧完成绘制，并检查实际截图中存在可见场景像素；桌面和手机尺寸的主要页面也已人工复核。验证版本与 CI 链接见[集成说明的验证记录](../docs/UI_INTEGRATION.md#验证记录)。
 
-**浏览器检查尚未通过核验。** 本地 Chromium 在启动阶段受到执行环境 Unix socket 权限限制，桌面与手机尺寸共 6 个用例均未进入页面断言；分支 CI 的执行结果待核验。CI 最后尝试保存 `test-results/**/*.png` 截图，缺少截图不使该保存步骤失败。既有 Python CI 的成功不能代替前端验证；详细记录见[集成说明的验证记录](../docs/UI_INTEGRATION.md#验证记录)。
+Three.js 视口是懒加载产物，本次构建为 592.99 kB（gzip 148.78 kB），仍有超过 500 kB 的 chunk 提示；该提示不代表构建失败。手机检查是浏览器尺寸与触控模拟，不能替代真实设备验证。
+
+## 界面截图
+
+以下截图来自提交 `107e91ab` 的 CI 浏览器运行，展示内置合成场景，不是真实视频重建结果。
+
+![桌面工作台](../docs/ui/workbench-desktop.png)
+
+[查看手机尺寸工作台](../docs/ui/workbench-mobile.png)。完整的工作台、实验页、检查器和视频预览截图保存在 [UI CI run 的 `ui-browser-screenshots` artifact](https://github.com/Milesssssss/video-gaussian-lab/actions/runs/45009815054)。
 
 ## 继续接入真实数据前
 

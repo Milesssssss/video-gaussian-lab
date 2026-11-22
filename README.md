@@ -95,4 +95,4 @@ npm run dev
 
 打开 [http://localhost:5173](http://localhost:5173)。前端不需要 API key、模型权重或 Python worker。在 `ui/` 内可用 `npm run check`、`npm test`、`npm run build` 验证类型、单元逻辑和生产构建。
 
-前端已在本地通过类型检查、16 项单元测试和生产构建。桌面 / 手机尺寸的 6 项浏览器检查在本地 Chromium 启动阶段受环境权限限制，尚未进入断言；已加入分支 CI，结果待核验。既有 Python 测试不代替前端验证。原型来源、ZIP 哈希、裁剪边界、验证记录和后续数据接口见 [UI 集成说明](docs/UI_INTEGRATION.md)，运行细节见 [UI README](ui/README.md)。
+前端已通过依赖安装、类型检查、16 项单元测试、生产构建和 6 项桌面 / 手机尺寸浏览器检查。已确认三维视口产生可见画面，并复核主要页面截图。验证版本、CI 证据、原型来源和后续数据接口见 [UI 集成说明](docs/UI_INTEGRATION.md)，运行细节和界面截图见 [UI README](ui/README.md)。这些检查验证前端功能，不代表真实模型或研究实验已经运行。

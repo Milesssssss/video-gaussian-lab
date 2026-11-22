@@ -70,24 +70,28 @@ GitHub Actions 引用使用本次已核对存在的官方版本：[checkout v7.0
 
 ### 验证记录
 
-下表记录 2026-11-22 本次集成的本地验证结果。类型检查、单元测试和构建已实际完成；浏览器在启动阶段受环境限制，分支 CI 仍待核验。不能用历史 Python CI 的成功替代本次前端结果。
+2026-11-22 核验代码提交：`107e91ab403fbf3c3f13e6359ca19b677593a0af`。
 
-| 检查 | 当前记录 | 结果能支持的结论 |
+- [UI CI run 45009815054](https://github.com/Milesssssss/video-gaussian-lab/actions/runs/45009815054)：依赖安装、类型检查、单元测试、生产构建、浏览器测试和截图上传均成功。
+- [Python CI run 45009815035](https://github.com/Milesssssss/video-gaussian-lab/actions/runs/45009815035)：既有回归测试通过；本 PR 没有修改 Python 研究逻辑。
+
+| 检查 | 结果 | 验证范围 |
 | --- | --- | --- |
-| `npm ci` | 分支 CI 待核验 | 仅在实际安装成功后确认 lockfile 可安装 |
-| `npm run check` | 本地通过 | 当前 TypeScript 类型检查通过 |
-| `npm test` | 本地 16 / 16 通过 | 合成演示与前端辅助逻辑的单元测试通过 |
-| `npm run build` | 本地通过；有 chunk 体积提示 | 当前生产构建可完成，不代表浏览器交互已通过 |
-| 桌面 / 手机尺寸浏览器检查 | 6 个用例均在本地 Chromium 启动阶段失败，未进入页面断言；分支 CI 待核验 | 尚不能判断这些浏览器用例是否通过 |
-| 本地视频元数据、抽帧、取消与失败路径 | 已编写浏览器用例；本地未进入断言，分支 CI 待核验 | 尚未验证浏览器中的解码与交互结果 |
-| GitHub UI workflow | 尚未取得本分支 / PR 的运行证据 | 仅在实际 job 成功后计为 CI 通过 |
-| 真实 SHARP / DP2 / 共享优化 / 独立指标 | 本次范围外，未运行 | 不能报告研究结果 |
+| `npm ci`、`npm run check` | 通过 | lockfile 可安装，TypeScript 检查通过 |
+| `npm test` | 16 / 16 通过 | 合成计算、协议展示、本地视频参数和点云导出来源 |
+| `npm run build` | 通过 | 生产构建完成；Three.js chunk 仍有体积提示 |
+| 桌面 / 手机尺寸浏览器检查 | 6 / 6 通过 | 场景控制、点云下载、六个实验臂、键盘探针、本地视频解码和退出行为 |
+| 三维视口可见像素断言 | 两种尺寸均通过 | 实际截图中央采样区中，最大 RGB 分量大于 80 的像素占比为桌面 0.4986、手机 0.7737，均大于 0.01 的防空白阈值 |
+| 人工截图检查 | 完成 | 工作台、实验对照、深度检查和视频预览已复核；首帧修复后重新确认桌面和手机工作台画面 |
+| 真实 SHARP / DP2 / 共享优化 / 独立指标 | 本次未运行 | 不能据此报告研究结果 |
 
-单元测试通过 `node --import tsx --test` 执行，避免 `tsx` CLI 本身额外建立 IPC。生产构建中的 Three.js 视口为懒加载 chunk，本次输出 591.99 kB、gzip 148.45 kB，仍触发默认超过 500 kB 的提示；这不是构建失败，后续是否继续拆包需结合实际加载表现决定。
+首轮交互测试通过后，人工截图发现工作台在首次绘制完成前被截成空白。修复增加 `pending / ready / lost / error` 绘制状态，在 GPU 完成且画面可呈现后才发布 `ready`；相同尺寸不再重复调用 `setSize()` 清空画布。测试同时检查实际画面像素，避免仅凭 canvas 已挂载就判定渲染成功。上述像素占比只用于识别空白视口，**不是重建质量指标**。
 
-浏览器测试定义在 [`workbench.spec.ts`](../ui/tests/workbench.spec.ts) 和 [`playwright.config.ts`](../ui/playwright.config.ts)，使用 Playwright 1.62.1 与 Chromium。3 个场景分别在 1440 × 1000 和 390 × 844 两种尺寸运行，共 6 个用例；手机配置是浏览器尺寸 / 触控模拟，不能代替真实设备验证。用例检查合成场景控制与点云来源、六个实验臂及无实测结果状态、键盘探针，以及 1.2 秒合成 WebM 的本地预览、无外部上传和退出行为。测试视频是专用合成 fixture，不是用户采集。
+浏览器用例位于 [`workbench.spec.ts`](../ui/tests/workbench.spec.ts)，使用生产构建、Playwright 1.62.1 和 Chromium，在 1440 × 1000 与 390 × 844 两种尺寸运行。测试视频是 1.2 秒的合成 WebM fixture，不是用户采集。手机配置是尺寸 / 触控模拟，不代替真实设备验证。本地运行环境不能启动 Chromium，因此浏览器证据来自上述 GitHub CI。
 
-本地尝试使用 `/usr/bin/chromium`，进程在页面建立前受到 Unix socket 权限限制，因此 6 个失败不能解释为 UI 断言失败，也不能视为浏览器通过。分支 CI 安装 Playwright 所需 Chromium 后执行同一套用例，结果与截图仍需实际检查；截图用于人工审图，不代替断言结果或研究评测。
+[桌面工作台截图](ui/workbench-desktop.png)与[手机工作台截图](ui/workbench-mobile.png)保留了 CI 生成的原始 PNG。完整 artifact `ui-browser-screenshots` 的 SHA-256 为 `58f8db5a063bcfa6b95c6ad1b99757cae22ed1261b61f5d8660d39a3f245ba2c`，包含 8 张页面截图和 2 张用于防空白检查的视口截图。
+
+单元测试使用 `node --import tsx --test`，避免 `tsx` CLI 额外建立 IPC。Three.js 视口为懒加载 chunk，此次 CI 构建为 592.99 kB、gzip 148.78 kB；保留默认超过 500 kB 的体积提示，没有调高阈值掩盖提示。
 
 ## 下一步：正式数据接口
 
