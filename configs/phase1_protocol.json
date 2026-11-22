@@ -1,0 +1,207 @@
+{
+  "schema_version": "0.1",
+  "kind": "research_protocol_registration",
+  "title": "Phase 1: known-camera static video Gaussian reconstruction",
+  "status": "draft_not_frozen",
+  "execution_enabled": false,
+  "implementation_exists": false,
+  "created_date": "2026-11-22",
+  "authoritative_protocol": "docs/EXPERIMENT_PROTOCOL.md",
+  "research_scope": {
+    "scene_type": "static_real_video",
+    "camera_intrinsics": "calibrated_per_frame",
+    "poses": "fixed_metric_T_world_camera",
+    "optimize_camera_poses": false,
+    "train_pretrained_models": false,
+    "learn_global_features": false,
+    "dynamic_scene": false,
+    "temporal_mode": "offline_batch_with_source_lookahead"
+  },
+  "entry_conditions": {
+    "data_available": false,
+    "camera_contract_verified": false,
+    "independent_geometry_available": false,
+    "model_use_conditions_resolved": false,
+    "hardware_profiled": false,
+    "runtime_versions_pinned": false,
+    "weight_checksums_recorded": false
+  },
+  "candidate_sources": {
+    "sharp": {
+      "repository": "https://github.com/apple-aiml-research/ml-sharp",
+      "source_commit": "aed6527499ef91cba3b54c18d49a870f25947190",
+      "weight_sha256": null,
+      "license_record": "docs/THIRD_PARTY.md",
+      "use_optional_depth_hook": false
+    },
+    "depth": {
+      "repository": "https://github.com/apple-aiml-research/ml-depth-pro-2",
+      "source_commit": "aa389cbb0b74341664ed663a0966c859905cd6c0",
+      "variant": "L",
+      "weight_sha256": null,
+      "license_record": "docs/THIRD_PARTY.md",
+      "output_semantics": "camera_z_depth_m",
+      "focal_source": "calibrated_input_fx"
+    }
+  },
+  "data_plan": {
+    "dev_scenes": 2,
+    "locked_test_scenes": 4,
+    "source_keyframes_per_scene_max": 48,
+    "evaluation_views_per_scene_target": 24,
+    "evaluation_time_blocks_target": 3,
+    "canonical_long_edge_px_candidate": 1280,
+    "frame_ids_frozen_before_inference": true,
+    "pose_provider_eval_rgb_usage_must_be_declared": true,
+    "eval_rgb_allowed_in_model_context": false,
+    "eval_rgb_allowed_in_scene_optimization": false,
+    "independent_reference_used_for_training": false
+  },
+  "depth_context_candidate": {
+    "mode": "joint_source_windows",
+    "window_size": 16,
+    "overlap": 4,
+    "ordering": "source_timestamp",
+    "repeated_frame_depth_reduction": "pixelwise_log_median_over_valid_predictions",
+    "heldout_frames_allowed": false,
+    "source_frames_with_incompatible_focal_require_separate_groups": true
+  },
+  "shared_design": {
+    "gaussian_parameter_space": "physical_values_before_renderer_adapter",
+    "sh_degree": 0,
+    "visibility_and_admission_rule": "same_rule_using_each_arm_own_geometry",
+    "baseline_S0_S1_may_read_DP2": false,
+    "capacity_candidates": [
+      250000,
+      500000,
+      1000000
+    ],
+    "frozen_capacity": null,
+    "frozen_optimization_steps": null,
+    "frozen_depth_loss_weight": null,
+    "frozen_wall_time_budget_s": null,
+    "reported_cost_modes": [
+      "cold_reconstruction",
+      "warm_reconstruction",
+      "cached_replay",
+      "component_breakdown"
+    ],
+    "freeze_record_required_before_test": true,
+    "feature_tracks_role": "source_diagnostics_only",
+    "frozen_teacher_supervision_coverage_min": null,
+    "frozen_low_coverage_patience_steps": null,
+    "freeze_record_template": "experiments/FREEZE_TEMPLATE.md"
+  },
+  "arms": [
+    {
+      "id": "S0",
+      "initializer": "sharp",
+      "depth_scale": false,
+      "rgb_optimization": false,
+      "depth_loss": false
+    },
+    {
+      "id": "S1",
+      "initializer": "sharp",
+      "depth_scale": false,
+      "rgb_optimization": true,
+      "depth_loss": false
+    },
+    {
+      "id": "S2",
+      "initializer": "sharp",
+      "depth_scale": true,
+      "rgb_optimization": true,
+      "depth_loss": false
+    },
+    {
+      "id": "S3",
+      "initializer": "sharp",
+      "depth_scale": true,
+      "rgb_optimization": true,
+      "depth_loss": true
+    },
+    {
+      "id": "D0",
+      "initializer": "depth_backprojected_gaussians",
+      "depth_scale": false,
+      "rgb_optimization": true,
+      "depth_loss": false
+    },
+    {
+      "id": "D1",
+      "initializer": "depth_backprojected_gaussians",
+      "depth_scale": false,
+      "rgb_optimization": true,
+      "depth_loss": true
+    }
+  ],
+  "run_plan": {
+    "P1a": {
+      "scenes": 2,
+      "base_arms": [
+        "S0",
+        "S1",
+        "S2",
+        "D0"
+      ],
+      "base_runs": 8,
+      "required_extra_depth_checks_if_retained": 4,
+      "extra_check_arms": [
+        "S3",
+        "D1"
+      ],
+      "diagnostic_reruns_logged_separately": true,
+      "additional_full_dev_run_cap": 8,
+      "paired_candidate_change_cap": 4,
+      "planned_run_cap_excluding_logged_failures": 20,
+      "candidate_selection_order": [
+        "resource_budget",
+        "ordinary_gaussian_footprint_opacity",
+        "depth_weight",
+        "optimization_schedule"
+      ]
+    },
+    "P1b": {
+      "scenes": 4,
+      "optimized_arms": [
+        "S1",
+        "S2",
+        "S3",
+        "D0",
+        "D1"
+      ],
+      "seeds": [
+        17,
+        29,
+        43
+      ],
+      "optimized_runs": 60,
+      "S0_diagnostic_exports": 4,
+      "start_condition": "P1a_resource_profile_and_protocol_freeze"
+    }
+  },
+  "outcomes": [
+    "retain_sharp",
+    "prefer_depth_initialization",
+    "repair_camera_pipeline_first",
+    "insufficient_evidence",
+    "stop_current_route"
+  ],
+  "results": null,
+  "failure_policy": {
+    "required_pairs_must_be_complete": true,
+    "missing_required_pair_conclusion": "inconclusive",
+    "survivor_only_primary_aggregation": false,
+    "same_config_infrastructure_retry_max": 1,
+    "algorithm_failure_recorded": true
+  },
+  "decision_rules": {
+    "status": "candidate_rules_freeze_on_dev",
+    "authority": "docs/EXPERIMENT_PROTOCOL.md#9-预注册的探索性决策规则",
+    "minimum_successful_scene_seed_pairs_per_comparison": 12,
+    "coverage_drop_max_percentage_points_candidate": 2,
+    "without_independent_geometry": "geometry_gate_NA_no_geometry_accuracy_claim",
+    "online_revisit_retention_claim_allowed": false
+  }
+}

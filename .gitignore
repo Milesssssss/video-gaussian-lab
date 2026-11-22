@@ -1,0 +1,33 @@
+# Local captures and model/run artifacts
+/data/
+/weights/
+/checkpoints/
+/cache/
+/outputs/
+/runs/
+/artifacts/
+/third_party/
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.ply
+*.splat
+*.spz
+*.mp4
+*.mov
+*.MOV
+*.exr
+*.npy
+*.npz
+
+# Local environment and secrets
+.env
+.env.*
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+
+# Keep explicitly named format examples if added later
+!*.example

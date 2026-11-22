@@ -1,0 +1,272 @@
+{
+  "schema_version": "0.1",
+  "kind": "format_example",
+  "description": "Synthetic format illustration only. These three image paths do not exist and this is not a runnable Phase 1 dataset.",
+  "scene_id": "synthetic_format_example",
+  "scene_split": "dev",
+  "units": {
+    "distance": "m",
+    "time": "s"
+  },
+  "camera_axes": "opencv_optical",
+  "transform": "T_world_camera",
+  "matrix_storage": "row_major",
+  "vector_convention": "column_vector",
+  "pixel_coordinates": "integer_center",
+  "depth_representation": "z_depth",
+  "pose_provider": {
+    "name": "synthetic_example",
+    "metric_scale": true,
+    "used_eval_rgb": false,
+    "timestamp_alignment_method": "synthetic_exact",
+    "reference_geometry_available": false
+  },
+  "preprocess": {
+    "undistort": true,
+    "operation_order": [
+      "orientation",
+      "undistort",
+      "crop",
+      "resize"
+    ],
+    "canonical_width_px": 1280,
+    "canonical_height_px": 720,
+    "K_is_for": "canonical_image",
+    "color_space": "srgb"
+  },
+  "split_policy": {
+    "status": "format_example_only_not_protocol_compliant",
+    "frozen_before_inference": true,
+    "source_frame_ids": [
+      "frame_000"
+    ],
+    "validation_frame_ids": [
+      "frame_001"
+    ],
+    "test_frame_ids": [
+      "frame_002"
+    ],
+    "eval_frames_in_network_context": false,
+    "split_sha256": null
+  },
+  "frames": [
+    {
+      "frame_id": "frame_000",
+      "timestamp_s": 0.0,
+      "split": "source",
+      "rgb_path": "data/synthetic_format_example/rgb/frame_000.png",
+      "rgb_sha256": null,
+      "width_px": 1280,
+      "height_px": 720,
+      "K": [
+        [
+          1000.0,
+          0.0,
+          639.5
+        ],
+        [
+          0.0,
+          1000.0,
+          359.5
+        ],
+        [
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "T_world_camera": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "depth": {
+        "path": null,
+        "source": "none",
+        "representation": "z_depth",
+        "unit": "m",
+        "sha256": null
+      },
+      "timestamp_kind": "synthetic_exact",
+      "pose_timestamp_s": 0.0,
+      "pose_interpolation": "none",
+      "tracking_status": "synthetic",
+      "distortion_model": "none_synthetic_pinhole",
+      "distortion_params": [],
+      "image_transform": {
+        "operations": [
+          "identity"
+        ],
+        "synthetic": true
+      }
+    },
+    {
+      "frame_id": "frame_001",
+      "timestamp_s": 0.5,
+      "split": "validation",
+      "rgb_path": "data/synthetic_format_example/rgb/frame_001.png",
+      "rgb_sha256": null,
+      "width_px": 1280,
+      "height_px": 720,
+      "K": [
+        [
+          1000.0,
+          0.0,
+          639.5
+        ],
+        [
+          0.0,
+          1000.0,
+          359.5
+        ],
+        [
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "T_world_camera": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.05
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "depth": {
+        "path": null,
+        "source": "none",
+        "representation": "z_depth",
+        "unit": "m",
+        "sha256": null
+      },
+      "timestamp_kind": "synthetic_exact",
+      "pose_timestamp_s": 0.5,
+      "pose_interpolation": "none",
+      "tracking_status": "synthetic",
+      "distortion_model": "none_synthetic_pinhole",
+      "distortion_params": [],
+      "image_transform": {
+        "operations": [
+          "identity"
+        ],
+        "synthetic": true
+      }
+    },
+    {
+      "frame_id": "frame_002",
+      "timestamp_s": 1.0,
+      "split": "test",
+      "rgb_path": "data/synthetic_format_example/rgb/frame_002.png",
+      "rgb_sha256": null,
+      "width_px": 1280,
+      "height_px": 720,
+      "K": [
+        [
+          1000.0,
+          0.0,
+          639.5
+        ],
+        [
+          0.0,
+          1000.0,
+          359.5
+        ],
+        [
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "T_world_camera": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.1
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "depth": {
+        "path": null,
+        "source": "none",
+        "representation": "z_depth",
+        "unit": "m",
+        "sha256": null
+      },
+      "timestamp_kind": "synthetic_exact",
+      "pose_timestamp_s": 1.0,
+      "pose_interpolation": "none",
+      "tracking_status": "synthetic",
+      "distortion_model": "none_synthetic_pinhole",
+      "distortion_params": [],
+      "image_transform": {
+        "operations": [
+          "identity"
+        ],
+        "synthetic": true
+      }
+    }
+  ],
+  "camera_id": "synthetic_camera",
+  "world_frame_id": "synthetic_world",
+  "clock_domain": "synthetic_monotonic",
+  "pose_status": "synthetic_format_example",
+  "calibration_sha256": null
+}
