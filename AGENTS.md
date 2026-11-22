@@ -1,6 +1,6 @@
 # Repository working instructions
 
-- This repository is currently a research design, not a working reconstruction implementation. Preserve the distinction between proposed, implemented, tested, and measured.
+- This repository contains the Phase 1 research design plus tested execution foundations in `src/vglab`. It is not a measured reconstruction stack: SHARP, Depth Pro 2, and official protocol runs have not been executed. Preserve the distinction between proposed, implemented, tested, and measured. `configs/phase1_protocol.json` stays `execution_enabled=false` until a real runner is verified.
 - The active scope is Phase 1 in `docs/PHASE1_SPEC.md`. Do not silently add pose optimization, dynamic reconstruction, learned global tokens, product integration, or unrelated work.
 - Primary language for project documentation is Chinese. Keep equations, units, experiment IDs, and source citations precise.
 - Before changing a technical assumption, read `docs/DATA_CONTRACT.md`, `docs/EXPERIMENT_PROTOCOL.md`, and `docs/DECISIONS.md`.
