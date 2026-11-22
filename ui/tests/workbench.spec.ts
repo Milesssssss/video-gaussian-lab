@@ -1,18 +1,52 @@
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
+
+async function visibleSceneRatio(page: Page, screenshot: Buffer): Promise<number> {
+  return page.evaluate(async (encoded) => {
+    const bytes = Uint8Array.from(atob(encoded), (character) => character.charCodeAt(0));
+    const image = await createImageBitmap(new Blob([bytes], { type: 'image/png' }));
+    const sample = document.createElement('canvas');
+    sample.width = 128;
+    sample.height = 96;
+    const context = sample.getContext('2d')!;
+    // Sample the actual compositor screenshot, excluding toolbar/HUD/timeline overlays.
+    // Reading WebGL directly after presentation can return a cleared drawing buffer.
+    context.drawImage(image, image.width * 0.15, image.height * 0.18,
+      image.width * 0.7, image.height * 0.5, 0, 0, sample.width, sample.height);
+    image.close();
+    const pixels = context.getImageData(0, 0, sample.width, sample.height).data;
+    let visible = 0;
+    for (let offset = 0; offset < pixels.length; offset += 4) {
+      if (Math.max(pixels[offset], pixels[offset + 1], pixels[offset + 2]) > 80) visible++;
+    }
+    return visible / (sample.width * sample.height);
+  }, screenshot.toString('base64'));
+}
 
 test('synthetic workspace responds to controls and exports explicitly marked point clouds', async ({ page }, testInfo) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
+  page.on('console', (message) => {
+    if (message.type() === 'error' && /WebGL|Shader|VALIDATE_STATUS/i.test(message.text())) {
+      errors.push(message.text());
+    }
+  });
   await page.goto('/');
   await expect(page.locator('.source-badge').first()).toHaveText('合成演示');
-  await expect(page.getByTestId('gaussian-webgl-viewport').locator('canvas')).toBeVisible();
+  const viewport = page.getByTestId('gaussian-webgl-viewport');
+  await expect(viewport.locator('canvas')).toBeVisible();
+  await expect(viewport).toHaveAttribute('data-render-state', 'ready');
+  const renderedCanvas = await viewport.screenshot({ path: testInfo.outputPath('webgl-canvas.png') });
+  const ratio = await visibleSceneRatio(page, renderedCanvas);
+  console.info(`${testInfo.project.name} visible scene pixel ratio: ${ratio.toFixed(4)}`);
+  expect(ratio, 'The center of the 3D viewport must contain visible scene pixels, not just an empty canvas').toBeGreaterThan(0.01);
   await expect(page.getByRole('alert')).toHaveCount(0);
   await page.screenshot({ path: testInfo.outputPath('workbench.png') });
   if (testInfo.project.name === 'mobile') await page.getByRole('button', { name: '切换参数面板' }).click();
   await page.getByRole('button', { name: '实验桌面推轨', exact: true }).click();
   await expect(page.locator('.app-shell')).toHaveAttribute('data-sequence-id', 'workbench');
+  await expect(viewport).toHaveAttribute('data-render-state', 'ready');
   await page.getByRole('button', { name: '逐帧', exact: true }).click();
   await expect(page.getByRole('slider', { name: '深度校正权重', exact: true })).toBeDisabled();
   await page.getByRole('button', { name: '聚合', exact: true }).click();

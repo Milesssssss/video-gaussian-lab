@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FC } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type FC } from 'react';
 import {
   ACESFilmicToneMapping,
   AxesHelper,
@@ -73,6 +73,8 @@ interface GaussianViewportProps {
   depthTemporalWeight: number;
 }
 
+type RenderState = 'pending' | 'ready' | 'lost' | 'error';
+
 function depthToColor(depth: number, out: Color) {
   const t = 1 - Math.max(0, Math.min(1, (depth - 1.2) / 6.5));
   const r = t > 0.55 ? (t - 0.55) * 2.2 : 0.05;
@@ -110,6 +112,8 @@ export const GaussianViewport: FC<GaussianViewportProps> = ({
   const hudCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [contextLost, setContextLost] = useState(false);
   const [renderError, setRenderError] = useState<string | null>(null);
+  const [renderState, setRenderState] = useState<RenderState>('pending');
+  const [hasPresentedFrame, setHasPresentedFrame] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
   const [activePreset, setActivePreset] = useState<CameraPreset>('free');
 
@@ -140,6 +144,7 @@ export const GaussianViewport: FC<GaussianViewportProps> = ({
     if (!container) return;
     setContextLost(false);
     setRenderError(null);
+    setHasPresentedFrame(false);
 
     let disposed = false;
     let contextUnavailable = false;
@@ -147,6 +152,14 @@ export const GaussianViewport: FC<GaussianViewportProps> = ({
     let frameId = 0;
     let timerId = 0;
     let pendingSync: WebGLSync | null = null;
+
+    function publishRenderState(state: RenderState) {
+      if (disposed || !container) return;
+      // Update synchronously so a screenshot cannot observe an old ready state after invalidation.
+      container.dataset.renderState = state;
+      setRenderState(state);
+    }
+    publishRenderState('pending');
 
     const _vecA = new Vector3();
     const _vecB = new Vector3();
@@ -173,6 +186,7 @@ export const GaussianViewport: FC<GaussianViewportProps> = ({
         powerPreference: 'high-performance',
       });
     } catch {
+      publishRenderState('error');
       setRenderError('当前浏览器无法创建 WebGL 视图。可检查硬件加速设置后重试，其他面板仍可使用。');
       return;
     }
@@ -184,6 +198,8 @@ export const GaussianViewport: FC<GaussianViewportProps> = ({
 
     const width = Math.max(1, container.clientWidth);
     const height = Math.max(1, container.clientHeight);
+    let renderedWidth = width;
+    let renderedHeight = height;
     renderer.setSize(width, height, false);
     renderer.domElement.style.display = 'block';
     renderer.domElement.style.width = '100%';
@@ -197,9 +213,11 @@ export const GaussianViewport: FC<GaussianViewportProps> = ({
       window.clearTimeout(timerId);
       pendingSync = null; // Context loss invalidates the GPU sync object.
       renderBusy = false;
+      publishRenderState('lost');
       setContextLost(true);
     };
     const onContextRestored = () => {
+      publishRenderState('pending');
       setContextLost(false);
       // Recreate offscreen environment targets and event handlers after context restoration.
       setRetryKey((value) => value + 1);
@@ -414,18 +432,39 @@ export const GaussianViewport: FC<GaussianViewportProps> = ({
       if (disposed || contextUnavailable) return;
       const gl = renderer.getContext() as WebGL2RenderingContext;
       pendingSync = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+      if (!pendingSync) {
+        renderBusy = false;
+        renderFailed = true;
+        publishRenderState('error');
+        setRenderError('浏览器未能确认三维绘制完成，请重试视图。');
+        return;
+      }
+      const fenceStartedAt = performance.now();
       gl.flush();
       const poll = () => {
         if (disposed || contextUnavailable) return;
         const state = pendingSync && gl.getSyncParameter(pendingSync, gl.SYNC_STATUS);
-        if (state === gl.UNSIGNALED) {
+        if (state !== gl.SIGNALED) {
+          if (performance.now() - fenceStartedAt > 15000) {
+            if (pendingSync) gl.deleteSync(pendingSync);
+            pendingSync = null;
+            renderBusy = false;
+            renderFailed = true;
+            publishRenderState('error');
+            setRenderError('三维绘制等待超时，请重试视图或检查浏览器图形加速。');
+            return;
+          }
           timerId = window.setTimeout(poll, 5);
         } else {
           if (pendingSync) gl.deleteSync(pendingSync);
           pendingSync = null;
           timerId = window.setTimeout(() => {
-            if (!disposed && !contextUnavailable) cb();
-          }, 70);
+            if (disposed || contextUnavailable) return;
+            // A visible canvas is not a presented frame. Let the browser present the completed GPU work.
+            frameId = requestAnimationFrame(() => {
+              if (!disposed && !contextUnavailable) cb();
+            });
+          }, isSoftwareGl ? 70 : 0);
         }
       };
       timerId = window.setTimeout(poll, 5);
@@ -433,6 +472,7 @@ export const GaussianViewport: FC<GaussianViewportProps> = ({
 
     function requestRender() {
       if (disposed || contextUnavailable || renderFailed) return;
+      publishRenderState('pending');
       if (renderBusy) {
         renderDirty = true;
         return;
@@ -472,15 +512,22 @@ export const GaussianViewport: FC<GaussianViewportProps> = ({
         } catch {
           renderBusy = false;
           renderFailed = true;
+          publishRenderState('error');
           setRenderError('三维预览暂时无法绘制。可重试初始化视图，其他面板仍可使用。');
           return;
         }
 
         const done = () => {
           renderBusy = false;
-          if (renderDirty) requestRender();
+          if (renderDirty) {
+            requestRender();
+          } else {
+            setHasPresentedFrame(true);
+            publishRenderState('ready');
+          }
         };
-        if (isSoftwareGl) afterDraw(done);
+        // Preserve hardware interaction cadence; only a stable frame can publish ready.
+        if (isSoftwareGl || !renderDirty) afterDraw(done);
         else done();
       });
     }
@@ -489,7 +536,8 @@ export const GaussianViewport: FC<GaussianViewportProps> = ({
     const sortEntries: { idx: number; distSq: number }[] = [];
 
     function syncSceneData() {
-      if (disposed || contextUnavailable) return;
+      if (disposed || contextUnavailable || renderFailed) return;
+      publishRenderState('pending');
       const {
         result: res,
         rawPoses: rPoses,
@@ -937,10 +985,15 @@ export const GaussianViewport: FC<GaussianViewportProps> = ({
     controls.addEventListener('end', onControlEnd);
 
     const resizeObserver = new ResizeObserver((entries) => {
-      if (disposed) return;
+      if (disposed || contextUnavailable || renderFailed) return;
       for (const entry of entries) {
-        const w = Math.max(1, entry.contentRect.width);
-        const h = Math.max(1, entry.contentRect.height);
+        const w = Math.max(1, Math.round(entry.contentRect.width));
+        const h = Math.max(1, Math.round(entry.contentRect.height));
+        // setSize rewrites canvas.width/height and clears its pixels, even for an unchanged size.
+        if (w === renderedWidth && h === renderedHeight) continue;
+        renderedWidth = w;
+        renderedHeight = h;
+        publishRenderState('pending');
         camera.aspect = w / h;
         camera.updateProjectionMatrix();
         renderer.setSize(w, h, false);
@@ -1003,7 +1056,7 @@ export const GaussianViewport: FC<GaussianViewportProps> = ({
     };
   }, [retryKey]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     syncSceneRef.current();
   }, [result, rawPoses, activeFrameIndex, colorMode, layers, depthConfidence, depthTemporalWeight]);
 
@@ -1037,8 +1090,16 @@ export const GaussianViewport: FC<GaussianViewportProps> = ({
       <div
         ref={mountRef}
         data-testid="gaussian-webgl-viewport"
+        data-render-state={renderState}
+        aria-busy={renderState === 'pending'}
         className="w-full h-full cursor-grab active:cursor-grabbing"
       />
+
+      {renderState === 'pending' && !hasPresentedFrame && (
+        <div role="status" className="absolute inset-0 z-10 flex items-center justify-center bg-[#07090E]/90 pointer-events-none">
+          <p className="text-sm text-slate-300">正在绘制合成三维场景…</p>
+        </div>
+      )}
 
       {(renderError || contextLost) && (
         <div className="absolute inset-0 flex items-center justify-center bg-[#07090E]/90 z-20">
