@@ -41,12 +41,12 @@ def classify_h2(
     parsed = _parse_scenes(scenes, max_coverage_drop_pp)
     if parsed is None:
         return Decision("inconclusive", "not_evaluated", None, (), "需要 4 个场景的完整配对")
-    improvements, psnr_drop, g1_flags, f_drop = parsed
+    improvements, psnr_drop, g1_flags, f_drop, geometry_complete = parsed
     mean_lpips = sum(improvements) / len(improvements)
     if seed_std is not None and seed_std > mean_lpips:
         return Decision("inconclusive", "not_evaluated", mean_lpips, improvements, "seed 波动大于候选增益")
-    if g0 == "available" and f_drop is None:
-        return Decision("inconclusive", "not_evaluated", mean_lpips, improvements, "G0 可用时必须提供 F-score")
+    if g0 == "available" and not geometry_complete:
+        return Decision("inconclusive", "not_evaluated", mean_lpips, improvements, "G0 可用时四个场景都要有 F-score")
     geometry = _geometry_status(g0, f_drop, max_drop=0.02)
     if not all(g1_flags):
         return Decision("g1_failed", geometry, mean_lpips, improvements, "覆盖下降超过候选门槛")
@@ -67,8 +67,10 @@ def classify_h4(
     parsed = _parse_scenes(scenes, max_coverage_drop_pp)
     if parsed is None or cost_supports is None:
         return Decision("inconclusive", "not_evaluated", None, (), "成本或完整场景配对尚未测得")
-    improvements, _, g1_flags, f_drop = parsed
+    improvements, _, g1_flags, f_drop, geometry_complete = parsed
     mean_lpips = sum(improvements) / len(improvements)
+    if g0 == "available" and not geometry_complete:
+        return Decision("inconclusive", "not_evaluated", mean_lpips, improvements, "G0 可用时四个场景都要有 F-score")
     geometry = _geometry_status(g0, f_drop, max_drop=0.02)
     if not all(g1_flags):
         return Decision("g1_failed", geometry, mean_lpips, improvements, "覆盖下降超过候选门槛")
@@ -92,7 +94,7 @@ def _geometry_status(g0: str, f_drop: float | None, *, max_drop: float) -> str:
 def _parse_scenes(
     scenes: list[dict],
     max_coverage_drop_pp: float,
-) -> tuple[tuple[float, ...], float, list[bool], float | None] | None:
+) -> tuple[tuple[float, ...], float, list[bool], float | None, bool] | None:
     if len(scenes) != 4:
         return None
     improvements = []
@@ -105,7 +107,13 @@ def _parse_scenes(
         coverage_flags.append(
             g1_coverage_ok(scene["coverage_baseline"], scene["coverage_candidate"], max_coverage_drop_pp)
         )
-        if "f_score_baseline" in scene:
+        has_baseline = "f_score_baseline" in scene
+        has_candidate = "f_score_candidate" in scene
+        if has_baseline and has_candidate:
             f_drops.append(float(scene["f_score_baseline"] - scene["f_score_candidate"]))
-    f_drop = sum(f_drops) / len(f_drops) if f_drops else None
-    return tuple(improvements), sum(psnr_drops) / len(psnr_drops), coverage_flags, f_drop
+        else:
+            f_drops.append(None)
+    geometry_complete = all(item is not None for item in f_drops)
+    numeric = [float(item) for item in f_drops if item is not None]
+    f_drop = sum(numeric) / len(numeric) if geometry_complete else None
+    return tuple(improvements), sum(psnr_drops) / len(psnr_drops), coverage_flags, f_drop, geometry_complete

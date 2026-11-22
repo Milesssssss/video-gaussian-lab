@@ -116,5 +116,14 @@ def test_h2_rules_do_not_treat_partial_tables_as_success():
     assert classify_h2(degraded, g0="available").geometry == "degraded"
     assert classify_h2(degraded, g0="available").status == "no_clear_gain"
     assert classify_h2(_scenes(0.02), g0="available").status == "inconclusive"
+    held = _scenes(0.02, f_score_baseline=0.5, f_score_candidate=0.5)
+    assert classify_h2(held, g0="available").status == "advance_candidate"
+    assert classify_h2(held, g0="available").geometry == "no_degradation"
+    partial = _scenes(0.02)
+    partial[0] = {**partial[0], "f_score_baseline": 0.5, "f_score_candidate": 0.5}
+    assert classify_h2(partial, g0="available").status == "inconclusive"
+    assert classify_h4(partial, g0="available", cost_supports=True).status == "inconclusive"
     assert classify_h4(_scenes(0.02), g0="na", cost_supports=None).status == "inconclusive"
     assert classify_h4(_scenes(0.02), g0="na", cost_supports=False).status == "no_clear_gain"
+    assert classify_h4(_scenes(0.02), g0="na", cost_supports=True).status == "advance_candidate"
+    assert classify_h4(held, g0="available", cost_supports=True).status == "advance_candidate"

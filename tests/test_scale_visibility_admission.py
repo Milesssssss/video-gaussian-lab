@@ -164,6 +164,44 @@ def test_admission_reserves_new_regions_and_does_not_clone_or_average():
     )
     assert blocked.kept == ()
     assert blocked.rejected == (("bad", "free_space_conflict"),)
+    opposite = _candidate(
+        "opposite",
+        0.0,
+        support=4,
+        layer_id=0,
+        rotation_wxyz=np.array([0.0, 1.0, 0.0, 0.0]),
+    )
+    different_color = _candidate(
+        "color",
+        0.0,
+        support=4,
+        layer_id=0,
+        color_linear_rgb=np.array([0.95, 0.05, 0.05]),
+    )
+    separated = admit(
+        [_candidate("a", 0.0, support=1, scale_std_m=np.full(3, 0.001)), opposite, different_color],
+        arm="D0",
+        budget=10,
+        new_region_fraction=0.0,
+        geometry_source="arm_initialization",
+        dedup_radius_m=0.05,
+        max_scale_m=1.0,
+    )
+    assert {item.gaussian_id for item in separated.kept} == {"a", "opposite", "color"}
+    far = [
+        _candidate(f"p{index}", float(index), support=1, scale_std_m=np.full(3, 0.01))
+        for index in range(3000)
+    ]
+    many = admit(
+        far,
+        arm="S1",
+        budget=3000,
+        new_region_fraction=0.0,
+        geometry_source="arm_initialization",
+        dedup_radius_m=0.05,
+        max_scale_m=1.0,
+    )
+    assert len(many.kept) == 3000
 
 
 def test_admission_rejects_direct_dp2_geometry_for_every_arm():

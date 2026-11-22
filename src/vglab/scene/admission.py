@@ -49,6 +49,8 @@ def admit(
     dedup_radius_m: float,
     max_scale_m: float,
     protocol_budget: bool = False,
+    orientation_dot_min: float = 0.9659258262890683,
+    color_l2_max: float = 0.15,
 ) -> AdmissionResult:
     if geometry_source != "arm_initialization":
         raise Dp2IsolationError(f"{arm} 的准入几何来源是 {geometry_source}；只能使用 arm_initialization，不能读取 DP2")
@@ -60,6 +62,8 @@ def admit(
         raise ContractError("正式预算只能是 250000、500000 或 1000000")
     if not 0 <= new_region_fraction <= 1 or dedup_radius_m < 0 or max_scale_m <= 0:
         raise ContractError("准入参数非法")
+    if not 0 <= orientation_dot_min <= 1 or color_l2_max < 0:
+        raise ContractError("对应确认阈值非法；这些数值尚未冻结")
     rejected: list[tuple[str, str]] = []
     valid: list[GaussianCandidate] = []
     for candidate in candidates:
@@ -72,11 +76,27 @@ def admit(
             valid.append(candidate)
     ranked = sorted(valid, key=_rank_key)
     deduped: list[GaussianCandidate] = []
+    cell = dedup_radius_m if dedup_radius_m > 0 else 1.0
+    buckets: dict[tuple[int, int, int], list[GaussianCandidate]] = {}
     for candidate in ranked:
-        if any(_same_surface(candidate, kept, dedup_radius_m) for kept in deduped):
+        index = _cell_index(candidate.mean_world_m, cell)
+        neighbors: list[GaussianCandidate] = []
+        for key in _neighbor_cells(index):
+            neighbors.extend(buckets.get(key, ()))
+        if any(
+            _confirmed_same_surface(
+                candidate,
+                kept,
+                dedup_radius_m,
+                orientation_dot_min,
+                color_l2_max,
+            )
+            for kept in neighbors
+        ):
             rejected.append((candidate.gaussian_id, "duplicate_represented"))
         else:
             deduped.append(candidate)
+            buckets.setdefault(index, []).append(candidate)
     selected = _select_with_new_region_quota(deduped, budget, new_region_fraction)
     selected_ids = {item.gaussian_id for item in selected}
     for candidate in deduped:
@@ -126,8 +146,37 @@ def _invalid_reason(candidate: GaussianCandidate, max_scale_m: float) -> str | N
     return None
 
 
-def _same_surface(left: GaussianCandidate, right: GaussianCandidate, radius_m: float) -> bool:
-    if left.layer_id is not None and right.layer_id is not None and left.layer_id != right.layer_id:
+def _cell_index(mean_world_m: np.ndarray, cell_m: float) -> tuple[int, int, int]:
+    coords = np.floor(np.asarray(mean_world_m, dtype=np.float64) / cell_m).astype(np.int64)
+    return int(coords[0]), int(coords[1]), int(coords[2])
+
+
+def _neighbor_cells(index: tuple[int, int, int]) -> tuple[tuple[int, int, int], ...]:
+    x, y, z = index
+    return tuple((x + dx, y + dy, z + dz) for dx in (-1, 0, 1) for dy in (-1, 0, 1) for dz in (-1, 0, 1))
+
+
+def _confirmed_same_surface(
+    left: GaussianCandidate,
+    right: GaussianCandidate,
+    radius_m: float,
+    orientation_dot_min: float,
+    color_l2_max: float,
+) -> bool:
+    """距离只进入候选邻域。层、朝向、颜色和尺度范围都一致才抑制其中一个。"""
+    if left.layer_id != right.layer_id:
         return False
-    delta = np.asarray(left.mean_world_m) - np.asarray(right.mean_world_m)
-    return float(np.linalg.norm(delta)) <= radius_m
+    delta = np.asarray(left.mean_world_m, dtype=np.float64) - np.asarray(right.mean_world_m, dtype=np.float64)
+    distance = float(np.linalg.norm(delta))
+    if distance > radius_m:
+        return False
+    left_scale = np.asarray(left.scale_std_m, dtype=np.float64)
+    right_scale = np.asarray(right.scale_std_m, dtype=np.float64)
+    if distance > float(np.min(left_scale) + np.min(right_scale)):
+        return False
+    left_q = np.asarray(left.rotation_wxyz, dtype=np.float64)
+    right_q = np.asarray(right.rotation_wxyz, dtype=np.float64)
+    if abs(float(np.dot(left_q, right_q))) < orientation_dot_min:
+        return False
+    color_delta = np.asarray(left.color_linear_rgb, dtype=np.float64) - np.asarray(right.color_linear_rgb, dtype=np.float64)
+    return float(np.linalg.norm(color_delta)) <= color_l2_max
