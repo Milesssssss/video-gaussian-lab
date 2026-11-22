@@ -80,3 +80,19 @@ P1b 不是现在就启动的任务。它依赖 P1a 的实际耗时、显存和�
 - [ ] 在真实 source 帧上运行冻结的 SHARP / DP2，并完成共享场景优化。
 - [ ] 完成开发集实验，冻结正式协议。
 - [ ] 完成测试集实验并形成结果决策。
+
+## 前端工作台（ui）
+
+[`ui/`](ui/README.md) 提供暗色研究工作台：查看合成场景、实验协议状态，以及本地视频的元数据和抽帧预览。**它尚未接通 SHARP、Depth Pro 2 或真实共享场景优化。** 演示数值不是实测结果，本地视频预览不生成深度、位姿或重建场景，正式协议仍为 `execution_enabled=false`。
+
+使用 Node.js 24，从仓库根目录执行：
+
+```bash
+cd ui
+npm ci
+npm run dev
+```
+
+打开 [http://localhost:5173](http://localhost:5173)。前端不需要 API key、模型权重或 Python worker。在 `ui/` 内可用 `npm run check`、`npm test`、`npm run build` 验证类型、单元逻辑和生产构建。
+
+前端已通过依赖安装、类型检查、16 项单元测试、生产构建和 6 项桌面 / 手机尺寸浏览器检查。已确认三维视口产生可见画面，并复核主要页面截图。验证版本、CI 证据、原型来源和后续数据接口见 [UI 集成说明](docs/UI_INTEGRATION.md)，运行细节和界面截图见 [UI README](ui/README.md)。这些检查验证前端功能，不代表真实模型或研究实验已经运行。
