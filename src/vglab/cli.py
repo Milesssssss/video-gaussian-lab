@@ -1,11 +1,13 @@
-"""已验证的命令：校验清单、打印阻塞、拒绝正式运行。"""
+"""已验证的命令：校验清单、打印阻塞、拒绝正式运行、合成深度约束演示。"""
 
 from __future__ import annotations
 
 import argparse
 import json
 import sys
+from pathlib import Path
 
+from vglab.demo import synthetic_depth_constraint_demo
 from vglab.ingest.manifest import execution_blockers, load_manifest, validate_schema
 from vglab.initialization.adapters import environment_blockers
 from vglab.paths import example_manifest_path, protocol_path
@@ -21,6 +23,9 @@ def main(argv: list[str] | None = None) -> int:
     validate.add_argument("--require-captured", action="store_true")
     sub.add_parser("show-blockers")
     sub.add_parser("run-official")
+    demo = sub.add_parser("demo-depth-constraint")
+    demo.add_argument("--steps", type=int, default=24)
+    demo.add_argument("--output", default=None)
     args = parser.parse_args(argv)
     if args.command == "validate-manifest":
         return _validate(args.path, args.require_captured)
@@ -37,7 +42,21 @@ def main(argv: list[str] | None = None) -> int:
             print(str(exc))
             return 2
         return 2
+    if args.command == "demo-depth-constraint":
+        return _demo(args.steps, args.output)
     return 2
+
+
+def _demo(steps: int, output: str | None) -> int:
+    if steps <= 0:
+        print("--steps 必须为正")
+        return 2
+    payload = synthetic_depth_constraint_demo(steps=steps)
+    text = json.dumps(payload, ensure_ascii=False, indent=2)
+    if output is not None:
+        Path(output).write_text(text + "\n", encoding="utf-8")
+    print(text)
+    return 0
 
 
 def _validate(path: str, require_captured: bool) -> int:

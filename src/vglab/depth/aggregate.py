@@ -27,6 +27,8 @@ class DepthPrediction:
     context_frame_ids: tuple[str, ...]
     representation: str = "z_depth"
     unit: str = "m"
+    k_matrix: np.ndarray | None = None
+    t_world_camera: np.ndarray | None = None
 
 
 def scalar_focal_px(k_matrix: np.ndarray) -> float:

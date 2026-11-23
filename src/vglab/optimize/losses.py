@@ -89,6 +89,63 @@ def depth_supervision(
     return DepthSupervision(loss, "computed", teacher_count, int(supervised.sum()), coverage, exclusions)
 
 
+@dataclass(frozen=True)
+class DepthLossGradient:
+    """与 `depth_supervision` 同规则的损失，加上对渲染期望深度的逐像素梯度。"""
+
+    supervision: DepthSupervision
+    grad_z_render: np.ndarray
+
+
+def depth_supervision_with_gradient(
+    z_render_m: np.ndarray,
+    z_dp2_m: np.ndarray,
+    teacher_mask: np.ndarray,
+    reliability: np.ndarray,
+    renderer_mask: np.ndarray,
+) -> DepthLossGradient:
+    """`depth_supervision` 的可微版本。
+
+    像素规则必须与 `depth_supervision` 完全相同：同一 teacher 有效区、同一 exclusions
+    计数、同一空监督语义。空监督时梯度为全零，而不是零损失的梯度。
+    """
+    render = np.asarray(z_render_m, dtype=np.float64)
+    teacher_depth = np.asarray(z_dp2_m, dtype=np.float64)
+    teacher = np.asarray(teacher_mask, dtype=bool)
+    renderer = np.asarray(renderer_mask, dtype=bool)
+    weight = np.asarray(reliability, dtype=np.float64)
+    if render.shape != teacher_depth.shape or teacher.shape != render.shape or renderer.shape != render.shape or weight.shape != render.shape:
+        raise ContractError("深度监督的各张图必须同网格")
+    grad = np.zeros_like(render)
+    finite_teacher = teacher & np.isfinite(teacher_depth) & (teacher_depth > 0)
+    finite_render = np.isfinite(render) & (render > 0)
+    positive_weight = np.isfinite(weight) & (weight > 0)
+    teacher_count = int(finite_teacher.sum())
+    supervised = finite_teacher & finite_render & renderer & positive_weight
+    exclusions = {
+        "teacher_invalid_or_nonpositive": int((teacher & ~finite_teacher).sum()),
+        "render_invalid_or_nonpositive": int((finite_teacher & ~finite_render).sum()),
+        "renderer_mask_excluded": int((finite_teacher & finite_render & ~renderer).sum()),
+        "nonpositive_reliability": int((finite_teacher & finite_render & renderer & ~positive_weight).sum()),
+    }
+    if teacher_count == 0 or int(supervised.sum()) == 0:
+        coverage = None if teacher_count == 0 else float(supervised.sum() / teacher_count)
+        return DepthLossGradient(
+            DepthSupervision(None, "skipped_empty_depth_mask", teacher_count, 0, coverage, exclusions),
+            grad,
+        )
+    coverage = float(supervised.sum() / teacher_count)
+    log_residual = np.log(render[supervised]) - np.log(teacher_depth[supervised])
+    used = weight[supervised]
+    denominator = float(np.sum(used))
+    loss = float(np.sum(used * np.abs(log_residual)) / denominator)
+    grad[supervised] = used * np.sign(log_residual) / (denominator * render[supervised])
+    return DepthLossGradient(
+        DepthSupervision(loss, "computed", teacher_count, int(supervised.sum()), coverage, exclusions),
+        grad,
+    )
+
+
 def rgb_loss(
     prediction_srgb: np.ndarray,
     target_srgb: np.ndarray,
